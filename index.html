@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リアルタイムチャットアプリ</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ファイルドロップエリア -->
+    <div class="file-drop-area" id="fileDropArea">
+        <div>
+            <div style="font-size: 48px; margin-bottom: 20px;">📁</div>
+            <div>ファイルをドロップしてください</div>
+        </div>
+    </div>
+
+    <!-- 認証画面 -->
+    <div class="auth-container" id="authContainer">
+        <div class="auth-box">
+            <h2>チャットアプリ</h2>
+            <div id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">メールアドレス</label>
+                    <input type="email" id="loginEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">パスワード</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button class="btn" onclick="login()">ログイン</button>
+                <button class="btn btn-secondary" onclick="showSignupForm()">新規登録</button>
+            </div>
+            <div id="signupForm" class="hidden">
+                <div class="form-group">
+                    <label for="signupEmail">メールアドレス</label>
+                    <input type="email" id="signupEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">パスワード</label>
+                    <input type="password" id="signupPassword" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">パスワード確認</label>
+                    <input type="password" id="confirmPassword" required minlength="6">
+                </div>
+                <button class="btn" onclick="signup()">新規登録</button>
+                <button class="btn btn-secondary" onclick="showLoginForm()">ログインに戻る</button>
+            </div>
+            <div id="authError" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- チャット画面 -->
+    <div class="container chat-container" id="chatContainer">
+        <div class="chat-header">
+            <div class="chat-title">チャット</div>
+            <div class="header-actions">
+                <button class="header-btn" onclick="showMap()">🗺️ マップ</button>
+                <button class="header-btn" onclick="logout()">ログアウト</button>
+            </div>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="loading" id="loadingIndicator">
+                <div class="spinner"></div>
+                メッセージを読み込み中...
+            </div>
+        </div>
+
+        <div class="message-input-container">
+            <div class="file-preview-container" id="filePreviewContainer"></div>
+            <div class="message-input-wrapper">
+                <textarea
+                    id="messageInput"
+                    class="message-input"
+                    placeholder="メッセージを入力..."
+                    rows="1"
+                    onkeydown="handleMessageKeydown(event)"
+                ></textarea>
+                <div class="input-actions">
+                    <input type="file" id="fileInput" multiple accept="image/*,video/*,audio/*,text/*,application/pdf" class="hidden">
+                    <button class="action-btn secondary" onclick="document.getElementById('fileInput').click()" title="ファイル添付">📎</button>
+                    <button class="action-btn" onclick="sendMessage()" title="送信">📤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- マップ画面 -->
+    <div class="map-container" id="mapContainer">
+        <div class="map-header">
+            <div class="chat-title">位置情報マップ</div>
+            <div class="header-actions">
+                <div class="map-style-dropdown">
+                    <button class="header-btn dropdown-toggle" onclick="toggleMapStyleDropdown()" id="mapStyleBtn">
+                        <span id="currentStyleText">🌐 OSM</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu" id="mapStyleDropdown">
+                        <div class="dropdown-item" onclick="selectMapStyle('osm')">
+                            <span class="style-icon">🌐</span>
+                            <span class="style-name">OSM</span>
+                        </div>
+                        <div class="dropdown-item" onclick="selectMapStyle('gsi')">
+                            <span class="style-icon">🗺️</span>
+                            <span class="style-name">地理院地図</span>
+                        </div>
+                        <div class="dropdown-item" onclick="selectMapStyle('satellite')">
+                            <span class="style-icon">🛰️</span>
+                            <span class="style-name">航空写真</span>
+                        </div>
+                        <div class="dropdown-item" onclick="selectMapStyle('vector')">
+                            <span class="style-icon">🔷</span>
+                            <span class="style-name">ベクタ地図</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="header-btn" onclick="toggleOverlayPanel()">📊 主題図</button>
+                <button class="header-btn" onclick="hideMap()">✕ 閉じる</button>
+            </div>
+        </div>
+
+        <!-- 主題図レイヤー制御パネル -->
+        <div class="overlay-controls hidden" id="overlayControls">
+            <div class="overlay-panel">
+                <div class="overlay-title">主題図</div>
+                <div class="overlay-item">
+                    <label class="overlay-checkbox">
+                        <input type="checkbox" id="floodOverlay" onchange="toggleFloodOverlay(this.checked)">
+                        <span class="checkmark"></span>
+                        <span class="overlay-label">洪水浸水想定区域</span>
+                    </label>
+                    <button class="legend-btn" onclick="showFloodLegend()" title="凡例を表示">
+                        📊
+                    </button>
+                </div>
+                <div class="overlay-item">
+                    <label class="overlay-checkbox">
+                        <input type="checkbox" id="internalFloodOverlay" onchange="toggleInternalFloodOverlay(this.checked)">
+                        <span class="checkmark"></span>
+                        <span class="overlay-label">内水（雨水出水）浸水想定区域</span>
+                    </label>
+                    <button class="legend-btn" onclick="showInternalFloodLegend()" title="凡例を表示">
+                        📊
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <!-- 洪水凡例モーダル -->
+    <div class="legend-modal" id="legendModal">
+        <div class="legend-content">
+            <div class="legend-header">
+                <h3>洪水浸水想定区域 凡例</h3>
+                <button class="legend-close" onclick="hideLegend()">✕</button>
+            </div>
+            <div class="legend-body">
+                <img src="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/img/shinsui_legend3.png"
+                     alt="洪水浸水想定区域凡例" class="legend-image">
+                <div class="legend-description">
+                    <p>※ この浸水想定区域図は、想定し得る最大規模の降雨により浸水が想定される区域と水深を示したものです。</p>
+                    <p>※ データ提供：国土地理院</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 内水凡例モーダル -->
+    <div class="legend-modal" id="internalFloodLegendModal">
+        <div class="legend-content">
+            <div class="legend-header">
+                <h3>内水（雨水出水）浸水想定区域 凡例</h3>
+                <button class="legend-close" onclick="hideInternalFloodLegend()">✕</button>
+            </div>
+            <div class="legend-body">
+                <img src="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/img/naisui_legend.png"
+                     alt="内水浸水想定区域凡例" class="legend-image">
+                <div class="legend-description">
+                    <p>※ この浸水想定区域図は、想定し得る最大規模の降雨により内水氾濫が想定される区域と水深を示したものです。</p>
+                    <p>※ データ提供：国土地理院</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- スクリプト -->
+    <script src="env.js"></script>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <script>
+        // グローバル変数
+        let currentUser = null;
+        let messagesListener = null;
+        let selectedFiles = [];
+        let map = null;
+        let markers = [];
+        let currentMapStyle = 'osm'; // デフォルトスタイル
+        let floodOverlayLayer = null; // 洪水オーバーレイ層
+        let internalFloodOverlayLayer = null; // 内水オーバーレイ層
+
+        // マップスタイル定義
+        // 注意: ベクタタイルは実験的機能のため、まずはラスタタイルで確実に動作確認
+        const mapStyles = {
+            osm: {
+                name: 'OSM',
+                icon: '🌐',
+                style: 'https://tile.openstreetmap.jp/styles/maptiler-basic-ja/style.json'
+            },
+            gsi: {
+                name: '地理院地図',
+                icon: '🗺️',
+                style: {
+                    version: 8,
+                    sources: {
+                        'gsi-standard': {
+                            type: 'raster',
+                            tiles: ['https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png'],
+                            tileSize: 256,
+                            attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>',
+                            minzoom: 2,
+                            maxzoom: 18
+                        }
+                    },
+                    layers: [{
+                        id: 'gsi-standard-layer',
+                        type: 'raster',
+                        source: 'gsi-standard',
+                        paint: {
+                            'raster-opacity': 1
+                        }
+                    }]
+                }
+            },
+            satellite: {
+                name: '航空写真',
+                icon: '🛰️',
+                style: {
+                    version: 8,
+                    sources: {
+                        'gsi-aerial': {
+                            type: 'raster',
+                            tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+                            tileSize: 256,
+                            attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>',
+                            minzoom: 2,
+                            maxzoom: 18
+                        }
+                    },
+                    layers: [{
+                        id: 'gsi-aerial-layer',
+                        type: 'raster',
+                        source: 'gsi-aerial',
+                        paint: {
+                            'raster-opacity': 1
+                        }
+                    }]
+                }
+            },
+            vector: {
+                name: 'ベクタ地図',
+                icon: '🔷',
+                style: 'https://gsi-cyberjapan.github.io/gsivectortile-mapbox-gl-js/std.json'
+            }
+        };
+
+        // Firebase初期化
+        console.log('Firebase Config:', window.ENV.FIREBASE_CONFIG); // デバッグ用ログ
+        let auth, db, storage;
+
+        try {
+            firebase.initializeApp(window.ENV.FIREBASE_CONFIG);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            storage = firebase.storage();
+            console.log('Firebase初期化完了');
+        } catch (error) {
+            console.error('Firebase初期化エラー:', error);
+            alert('Firebase の初期化に失敗しました。設定を確認してください。');
+        }
+
+        // 認証状態の監視
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                showChatContainer();
+                loadMessages();
+            } else {
+                currentUser = null;
+                showAuthContainer();
+            }
+        });
+
+        // 認証フォーム制御
+        window.showLoginForm = function() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('signupForm').classList.add('hidden');
+            clearAuthError();
+        }
+
+        window.showSignupForm = function() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('signupForm').classList.remove('hidden');
+            clearAuthError();
+        }
+
+        function clearAuthError() {
+            document.getElementById('authError').textContent = '';
+        }
+
+        // ログイン
+        window.login = async function() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            console.log('ログイン試行:', email); // デバッグ用ログ（パスワードは記録しない）
+
+            if (!email || !password) {
+                showAuthError('メールアドレスとパスワードを入力してください。');
+                return;
+            }
+
+            if (!auth) {
+                showAuthError('Firebase認証が初期化されていません。ページを再読み込みしてください。');
+                return;
+            }
+
+            try {
+                console.log('認証リクエスト送信中...');
+                const result = await auth.signInWithEmailAndPassword(email, password);
+                console.log('ログイン成功:', result.user.uid);
+            } catch (error) {
+                console.error('ログインエラー詳細:', {
+                    code: error.code,
+                    message: error.message,
+                    email: email
+                });
+                showAuthError(getErrorMessage(error));
+            }
+        }
+
+        // サインアップ
+        window.signup = async function() {
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!email || !password || !confirmPassword) {
+                showAuthError('すべてのフィールドを入力してください。');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showAuthError('パスワードが一致しません。');
+                return;
+            }
+
+            if (password.length < 6) {
+                showAuthError('パスワードは6文字以上で入力してください。');
+                return;
+            }
+
+            try {
+                console.log('サインアップリクエスト送信中...');
+                const result = await auth.createUserWithEmailAndPassword(email, password);
+                console.log('サインアップ成功:', result.user.uid);
+            } catch (error) {
+                console.error('サインアップエラー詳細:', {
+                    code: error.code,
+                    message: error.message,
+                    email: email
+                });
+                showAuthError(getErrorMessage(error));
+            }
+        }
+
+        // ログアウト
+        window.logout = async function() {
+            try {
+                await auth.signOut();
+            } catch (error) {
+                console.error('ログアウトエラー:', error);
+            }
+        }
+
+        // エラーメッセージ表示
+        function showAuthError(message) {
+            document.getElementById('authError').textContent = message;
+        }
+
+        // Firebase エラーメッセージを日本語に変換
+        function getErrorMessage(error) {
+            console.log('Firebase Error Details:', error); // デバッグ用ログ
+
+            switch (error.code) {
+                case 'auth/user-not-found':
+                    return 'ユーザーが見つかりません。新規登録を行ってください。';
+                case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    return 'メールアドレスまたはパスワードが間違っています。';
+                case 'auth/email-already-in-use':
+                    return 'このメールアドレスは既に使用されています。';
+                case 'auth/weak-password':
+                    return 'パスワードが弱すぎます。6文字以上で入力してください。';
+                case 'auth/invalid-email':
+                    return 'メールアドレスの形式が正しくありません。';
+                case 'auth/too-many-requests':
+                    return 'ログイン試行回数が多すぎます。しばらく待ってから再試行してください。';
+                case 'auth/network-request-failed':
+                    return 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+                case 'auth/internal-error':
+                    return '内部エラーが発生しました。Firebase設定を確認してください。';
+                default:
+                    return `エラーが発生しました: ${error.code || 'unknown'} - ${error.message || '詳細不明'}`;
+            }
+        }
+
+        // 画面切り替え
+        function showAuthContainer() {
+            document.getElementById('authContainer').style.display = 'flex';
+            document.getElementById('chatContainer').style.display = 'none';
+        }
+
+        function showChatContainer() {
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('chatContainer').style.display = 'flex';
+
+            // 位置情報の許可を事前にリクエスト（初回のみ）
+            requestLocationPermission();
+        }
+
+        // 位置情報の許可をリクエスト
+        async function requestLocationPermission() {
+            if (!navigator.geolocation) {
+                console.warn('位置情報がサポートされていません');
+                return;
+            }
+
+            try {
+                // 一度位置情報を取得して許可を求める
+                await getCurrentLocation();
+                console.log('位置情報の許可が得られました');
+            } catch (error) {
+                console.warn('位置情報の許可が得られませんでした:', error.message);
+                // 許可が得られなくても続行（メッセージ送信時に位置情報なしで送信）
+            }
+        }
+
+        // メッセージ送信
+        window.sendMessage = async function() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+
+            if (!text && selectedFiles.length === 0) {
+                return;
+            }
+
+            try {
+                const messageData = {
+                    text: text,
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    files: []
+                };
+
+                // 自動的に位置情報を取得
+                try {
+                    if (navigator.geolocation) {
+                        const position = await getCurrentLocation();
+                        messageData.location = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        console.log('位置情報を自動取得:', messageData.location);
+                    }
+                } catch (locationError) {
+                    console.warn('位置情報の取得に失敗（無視して続行）:', locationError);
+                    // 位置情報の取得に失敗してもメッセージ送信は続行
+                }
+
+                // ファイルアップロード
+                if (selectedFiles.length > 0) {
+                    for (const file of selectedFiles) {
+                        const fileUrl = await uploadFile(file);
+                        messageData.files.push({
+                            name: file.name,
+                            url: fileUrl,
+                            type: file.type,
+                            size: file.size
+                        });
+                    }
+                }
+
+                // メッセージ保存
+                await db.collection('messages').add(messageData);
+
+                // 入力をクリア
+                input.value = '';
+                selectedFiles = [];
+                updateFilePreview();
+                autoResize(input);
+
+            } catch (error) {
+                console.error('メッセージ送信エラー:', error);
+
+                let errorMessage = 'メッセージの送信に失敗しました。';
+
+                if (error.message.includes('Firebase Storage')) {
+                    errorMessage = `ファイルのアップロードに失敗しました: ${error.message}`;
+                } else if (error.message.includes('権限')) {
+                    errorMessage = error.message;
+                } else if (error.code === 'permission-denied') {
+                    errorMessage = 'メッセージの保存権限がありません。Firestoreの設定を確認してください。';
+                }
+
+                alert(errorMessage);
+            }
+        }
+
+        // ファイルアップロード
+        async function uploadFile(file) {
+            if (file.size > window.ENV.MAX_FILE_SIZE) {
+                throw new Error(`ファイルサイズが上限（${window.ENV.MAX_FILE_SIZE / 1024 / 1024}MB）を超えています。`);
+            }
+
+            if (!currentUser) {
+                throw new Error('ユーザーが認証されていません。');
+            }
+
+            try {
+                console.log('ファイルアップロード開始:', file.name, 'ユーザー:', currentUser.uid);
+
+                const fileName = `${Date.now()}_${file.name}`;
+                const fileRef = storage.ref(`uploads/${fileName}`);
+
+                console.log('アップロード先:', `uploads/${fileName}`);
+
+                const snapshot = await fileRef.put(file);
+                const downloadURL = await snapshot.ref.getDownloadURL();
+
+                console.log('アップロード完了:', downloadURL);
+                return downloadURL;
+
+            } catch (error) {
+                console.error('ファイルアップロードエラー:', error);
+
+                if (error.code === 'storage/unauthorized') {
+                    throw new Error('ファイルのアップロード権限がありません。Firebase Storageの設定を確認してください。');
+                } else if (error.code === 'storage/invalid-format') {
+                    throw new Error('無効なファイル形式です。');
+                } else if (error.code === 'storage/invalid-argument') {
+                    throw new Error('ファイルが破損している可能性があります。');
+                } else {
+                    throw new Error(`ファイルアップロードに失敗しました: ${error.message}`);
+                }
+            }
+        }
+
+        // メッセージ読み込み
+        function loadMessages() {
+            if (messagesListener) {
+                messagesListener();
+            }
+
+            messagesListener = db.collection('messages')
+                .orderBy('timestamp', 'asc')
+                .limit(window.ENV.MESSAGE_LIMIT)
+                .onSnapshot((snapshot) => {
+                    const messagesContainer = document.getElementById('messagesContainer');
+                    const loadingIndicator = document.getElementById('loadingIndicator');
+
+                    loadingIndicator.style.display = 'none';
+
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added') {
+                            displayMessage(change.doc.data());
+                        }
+                    });
+
+                    // メッセージコンテナを最下部にスクロール
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                });
+        }
+
+        // メッセージ表示
+        function displayMessage(messageData) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${messageData.userId === currentUser.uid ? 'own' : ''}`;
+
+            const timestamp = messageData.timestamp ?
+                messageData.timestamp.toDate().toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : '';
+
+            let filesHtml = '';
+            if (messageData.files && messageData.files.length > 0) {
+                filesHtml = messageData.files.map(file => {
+                    if (file.type.startsWith('image/')) {
+                        return `
+                            <div class="message-file">
+                                <img src="${file.url}" alt="${file.name}" class="file-preview" onclick="window.open('${file.url}', '_blank')">
+                                <div class="file-info">${file.name} (${formatFileSize(file.size)})</div>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="message-file">
+                                <div class="file-info">
+                                    📎 <a href="${file.url}" target="_blank" style="color: inherit; text-decoration: none;">
+                                        ${file.name} (${formatFileSize(file.size)})
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }).join('');
+            }
+
+            let locationHtml = '';
+            if (messageData.location) {
+                const lat = parseFloat(messageData.location.lat).toFixed(6);
+                const lng = parseFloat(messageData.location.lng).toFixed(6);
+                locationHtml = `
+                    <div class="location-message" onclick="showLocationOnMap(${messageData.location.lat}, ${messageData.location.lng})">
+                        <span class="location-icon">📍</span>
+                        <div class="location-info">
+                            <div class="location-text">位置情報を表示</div>
+                            <div class="location-coords">緯度: ${lat}, 経度: ${lng}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="message-header">
+                        <span>${messageData.userEmail}</span>
+                        <span>${timestamp}</span>
+                    </div>
+                    ${messageData.text ? `<div class="message-text">${escapeHtml(messageData.text)}</div>` : ''}
+                    ${filesHtml}
+                    ${locationHtml}
+                </div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+        }
+
+        // ファイルサイズフォーマット
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // HTML エスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ファイル選択イベント
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            handleFileSelect(e.target.files);
+        });
+
+        function handleFileSelect(files) {
+            const fileArray = Array.from(files);
+
+            if (selectedFiles.length + fileArray.length > window.ENV.MAX_FILES_COUNT) {
+                alert(`ファイルは最大${window.ENV.MAX_FILES_COUNT}個まで選択できます。`);
+                return;
+            }
+
+            for (const file of fileArray) {
+                if (file.size > window.ENV.MAX_FILE_SIZE) {
+                    alert(`ファイル「${file.name}」のサイズが上限（${window.ENV.MAX_FILE_SIZE / 1024 / 1024}MB）を超えています。`);
+                    continue;
+                }
+                selectedFiles.push(file);
+            }
+
+            updateFilePreview();
+        }
+
+        // ファイルプレビュー更新
+        function updateFilePreview() {
+            const container = document.getElementById('filePreviewContainer');
+            container.innerHTML = '';
+
+            selectedFiles.forEach((file, index) => {
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'file-preview-item';
+
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    img.onload = () => URL.revokeObjectURL(img.src);
+                    previewDiv.appendChild(img);
+                } else {
+                    previewDiv.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 24px;">📄</div>`;
+                }
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'file-remove-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.onclick = () => removeFile(index);
+                previewDiv.appendChild(removeBtn);
+
+                container.appendChild(previewDiv);
+            });
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFilePreview();
+        }
+
+        // ドラッグ&ドロップ
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            document.getElementById('fileDropArea').classList.add('active');
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            if (e.clientX === 0 && e.clientY === 0) {
+                document.getElementById('fileDropArea').classList.remove('active');
+            }
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.getElementById('fileDropArea').classList.remove('active');
+
+            if (e.dataTransfer.files) {
+                handleFileSelect(e.dataTransfer.files);
+            }
+        });
+
+        // メッセージ入力の制御
+        window.handleMessageKeydown = function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // テキストエリアの自動リサイズ
+        document.getElementById('messageInput').addEventListener('input', function() {
+            autoResize(this);
+        });
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+
+        // 位置情報共有
+        window.shareLocation = async function() {
+            if (!navigator.geolocation) {
+                alert('このブラウザでは位置情報がサポートされていません。');
+                return;
+            }
+
+            try {
+                const position = await getCurrentLocation();
+                const messageData = {
+                    text: '',
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    location: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    },
+                    files: []
+                };
+
+                await db.collection('messages').add(messageData);
+            } catch (error) {
+                console.error('位置情報共有エラー:', error);
+                alert('位置情報の取得に失敗しました。');
+            }
+        }
+
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('位置情報がサポートされていません'));
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: false, // バッテリー節約のため精度を下げる
+                    timeout: 5000, // タイムアウトを5秒に短縮
+                    maximumAge: 5 * 60 * 1000 // 5分間キャッシュを使用
+                });
+            });
+        }
+
+        // マップ機能
+        window.showMap = async function() {
+            document.getElementById('mapContainer').classList.add('active');
+            if (!map) {
+                await initializeMap();
+            } else {
+                updateMapStyleButton();
+            }
+            updateMapMarkers();
+        }
+
+        window.hideMap = function() {
+            document.getElementById('mapContainer').classList.remove('active');
+        }
+
+        async function initializeMap() {
+            try {
+                // 動的に初期中心位置を決定
+                const initialCenter = await getMapInitialCenter();
+
+                map = new maplibregl.Map({
+                    container: 'map',
+                    style: mapStyles[currentMapStyle].style,
+                    center: initialCenter,
+                    zoom: window.ENV.DEFAULT_MAP_ZOOM
+                });
+
+                console.log('地図を初期化しました。中心位置:', initialCenter);
+
+                map.addControl(new maplibregl.NavigationControl());
+
+                // スタイル変更時にマーカーを再表示
+                map.on('styledata', () => {
+                    setTimeout(() => {
+                        updateMapMarkers();
+                    }, 100);
+                });
+
+                // 詳細なエラーハンドリングとデバッグ
+                map.on('error', (e) => {
+                    console.error('地図エラー詳細:', {
+                        error: e.error,
+                        sourceId: e.sourceId,
+                        type: e.type,
+                        currentStyle: currentMapStyle
+                    });
+
+                    // タイル読み込みエラーの詳細を表示
+                    if (e.sourceId) {
+                        console.error(`ソース "${e.sourceId}" でエラー:`, e.error);
+                    }
+                });
+
+                // タイル読み込み開始時のログ
+                map.on('sourcedata', (e) => {
+                    if (e.sourceDataType === 'metadata') {
+                        console.log(`ソース "${e.sourceId}" のメタデータ読み込み完了`);
+                    }
+                    if (e.sourceDataType === 'content') {
+                        console.log(`ソース "${e.sourceId}" のタイル読み込み中`);
+                    }
+                });
+
+                // スタイル読み込み完了時のログ
+                map.on('styleimagemissing', (e) => {
+                    console.warn('スタイル画像が見つかりません:', e.id);
+                });
+
+                // ロード完了時の処理
+                map.on('load', () => {
+                    console.log('地図ロード完了:', mapStyles[currentMapStyle].name);
+                });
+
+                updateMapStyleButton();
+
+            } catch (error) {
+                console.error('地図初期化エラー:', error);
+                alert('地図の初期化に失敗しました。');
+            }
+        }
+
+        // ドロップダウンメニューの表示/非表示切り替え
+        window.toggleMapStyleDropdown = function() {
+            const dropdown = document.getElementById('mapStyleDropdown');
+            const isVisible = dropdown.classList.contains('show');
+
+            if (isVisible) {
+                hideMapStyleDropdown();
+            } else {
+                showMapStyleDropdown();
+            }
+        }
+
+        // ドロップダウンメニューを表示
+        function showMapStyleDropdown() {
+            const dropdown = document.getElementById('mapStyleDropdown');
+            dropdown.classList.add('show');
+
+            // 現在選択されているスタイルをハイライト
+            updateDropdownSelection();
+
+            // ドロップダウン外をクリックしたら閉じる
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdownOnOutsideClick);
+            }, 0);
+        }
+
+        // ドロップダウンメニューを非表示
+        function hideMapStyleDropdown() {
+            const dropdown = document.getElementById('mapStyleDropdown');
+            dropdown.classList.remove('show');
+            document.removeEventListener('click', closeDropdownOnOutsideClick);
+        }
+
+        // ドロップダウン外クリック時の処理
+        function closeDropdownOnOutsideClick(event) {
+            const dropdown = document.getElementById('mapStyleDropdown');
+            const button = document.getElementById('mapStyleBtn');
+
+            if (!dropdown.contains(event.target) && !button.contains(event.target)) {
+                hideMapStyleDropdown();
+            }
+        }
+
+        // マップスタイル選択
+        window.selectMapStyle = function(styleKey) {
+            if (!map || currentMapStyle === styleKey) {
+                hideMapStyleDropdown();
+                return;
+            }
+
+            // スタイルを変更
+            currentMapStyle = styleKey;
+            map.setStyle(mapStyles[currentMapStyle].style);
+
+            // UI を更新
+            updateCurrentStyleDisplay();
+            hideMapStyleDropdown();
+
+            // スタイル読み込み完了後にマーカーと主題図を再表示
+            map.once('styledata', () => {
+                setTimeout(() => {
+                    updateMapMarkers();
+                    redrawActiveOverlays(); // チェックされている主題図を再描画
+                }, 100);
+            });
+
+            console.log('マップスタイル変更:', mapStyles[currentMapStyle].name);
+        }
+
+        // 現在のスタイル表示を更新
+        function updateCurrentStyleDisplay() {
+            const currentStyleText = document.getElementById('currentStyleText');
+            if (currentStyleText) {
+                const style = mapStyles[currentMapStyle];
+                currentStyleText.innerHTML = `${style.icon} ${style.name}`;
+            }
+        }
+
+        // ドロップダウンの選択状態を更新
+        function updateDropdownSelection() {
+            const items = document.querySelectorAll('#mapStyleDropdown .dropdown-item');
+            items.forEach(item => {
+                item.classList.remove('selected');
+                const onclick = item.getAttribute('onclick');
+                if (onclick && onclick.includes(`'${currentMapStyle}'`)) {
+                    item.classList.add('selected');
+                }
+            });
+        }
+
+        // 初期化時にスタイル表示を更新（従来のupdateMapStyleButtonを置き換え）
+        function updateMapStyleButton() {
+            updateCurrentStyleDisplay();
+            updateDropdownSelection();
+        }
+
+        function updateMapMarkers() {
+            if (!map) return;
+
+            // 既存のマーカーをクリア
+            markers.forEach(marker => marker.remove());
+            markers = [];
+
+            // メッセージから位置情報を取得してマーカーを追加
+            db.collection('messages')
+                .where('location', '!=', null)
+                .orderBy('location')
+                .orderBy('timestamp', 'desc')
+                .limit(50)
+                .get()
+                .then((snapshot) => {
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        if (data.location) {
+                            const popupContent = createMarkerPopupContent(data);
+
+                            const marker = new maplibregl.Marker({
+                                color: data.userId === currentUser?.uid ? '#667eea' : '#ff6b6b'
+                            })
+                                .setLngLat([data.location.lng, data.location.lat])
+                                .setPopup(new maplibregl.Popup({
+                                    closeButton: true,
+                                    closeOnClick: false,
+                                    maxWidth: '300px',
+                                    className: 'custom-popup'
+                                }).setHTML(popupContent))
+                                .addTo(map);
+
+                            // マーカーにホバー効果を追加
+                            const markerElement = marker.getElement();
+                            markerElement.style.cursor = 'pointer';
+
+                            const tooltipText = data.timestamp ?
+                                `${data.userEmail} - ${data.timestamp.toDate().toLocaleDateString('ja-JP')}` :
+                                data.userEmail;
+                            markerElement.title = tooltipText;
+
+                            // マーカークリック時のイベント
+                            markerElement.addEventListener('click', () => {
+                                console.log('マーカークリック:', {
+                                    user: data.userEmail,
+                                    message: data.text,
+                                    location: data.location
+                                });
+                            });
+
+                            markers.push(marker);
+                        }
+                    });
+
+                    console.log(`マップに${markers.length}個のマーカーを追加しました`);
+                })
+                .catch((error) => {
+                    console.error('マーカー取得エラー:', error);
+                });
+        }
+
+        // マーカーのポップアップコンテンツを作成
+        function createMarkerPopupContent(messageData) {
+            const timestamp = messageData.timestamp ?
+                messageData.timestamp.toDate().toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : '時刻不明';
+
+            const lat = parseFloat(messageData.location.lat).toFixed(6);
+            const lng = parseFloat(messageData.location.lng).toFixed(6);
+
+            let filesHtml = '';
+            if (messageData.files && messageData.files.length > 0) {
+                filesHtml = messageData.files.map(file => {
+                    if (file.type.startsWith('image/')) {
+                        return `<img src="${file.url}" alt="${file.name}" style="max-width: 100%; max-height: 150px; margin: 5px 0; border-radius: 4px;" onclick="window.open('${file.url}', '_blank')">`;
+                    } else {
+                        return `<div style="margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 4px;">📎 <a href="${file.url}" target="_blank" style="color: #667eea; text-decoration: none;">${file.name}</a></div>`;
+                    }
+                }).join('');
+            }
+
+            return `
+                <div class="map-popup-content">
+                    <div class="popup-header">
+                        <strong>${escapeHtml(messageData.userEmail)}</strong>
+                        <div class="popup-time">${timestamp}</div>
+                    </div>
+
+                    ${messageData.text ? `
+                        <div class="popup-message">
+                            ${escapeHtml(messageData.text)}
+                        </div>
+                    ` : ''}
+
+                    ${filesHtml}
+
+                    <div class="popup-location">
+                        📍 ${lat}, ${lng}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.showLocationOnMap = async function(lat, lng) {
+            await showMap();
+            setTimeout(() => {
+                if (map) {
+                    map.flyTo({
+                        center: [lng, lat],
+                        zoom: 15
+                    });
+                }
+            }, 100);
+        }
+
+        // 洪水オーバーレイ層の表示/非表示切り替え
+        window.toggleFloodOverlay = function(checked) {
+            if (!map) return;
+
+            if (checked) {
+                // オーバーレイ層を追加
+                try {
+                    if (!map.getSource('flood-overlay')) {
+                        map.addSource('flood-overlay', {
+                            type: 'raster',
+                            tiles: ['https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png'],
+                            tileSize: 256,
+                            attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>',
+                            minzoom: 2,
+                            maxzoom: 18
+                        });
+                    }
+
+                    if (!map.getLayer('flood-overlay-layer')) {
+                        map.addLayer({
+                            id: 'flood-overlay-layer',
+                            type: 'raster',
+                            source: 'flood-overlay',
+                            paint: {
+                                'raster-opacity': 0.5 // 50%透過
+                            }
+                        });
+                    }
+
+                    floodOverlayLayer = 'flood-overlay-layer';
+                    console.log('洪水オーバーレイ層を表示しました');
+                } catch (error) {
+                    console.error('洪水オーバーレイ層の追加に失敗:', error);
+                }
+            } else {
+                // オーバーレイ層を削除
+                try {
+                    if (map.getLayer('flood-overlay-layer')) {
+                        map.removeLayer('flood-overlay-layer');
+                    }
+                    if (map.getSource('flood-overlay')) {
+                        map.removeSource('flood-overlay');
+                    }
+                    floodOverlayLayer = null;
+                    console.log('洪水オーバーレイ層を非表示にしました');
+                } catch (error) {
+                    console.error('洪水オーバーレイ層の削除に失敗:', error);
+                }
+            }
+        }
+
+        // 洪水凡例モーダルの表示
+        window.showFloodLegend = function() {
+            const modal = document.getElementById('legendModal');
+            modal.classList.add('show');
+
+            // 初期位置を設定（画面中央やや左上）
+            if (!modal.hasAttribute('data-positioned')) {
+                modal.style.left = '20px';
+                modal.style.top = '100px';
+                modal.setAttribute('data-positioned', 'true');
+            }
+
+            // ドラッグ機能を初期化
+            initializeDragging(modal);
+        }
+
+        // 洪水凡例モーダルの非表示
+        window.hideLegend = function() {
+            const modal = document.getElementById('legendModal');
+            modal.classList.remove('show');
+        }
+
+        // 内水オーバーレイ層の表示/非表示切り替え
+        window.toggleInternalFloodOverlay = function(checked) {
+            if (!map) return;
+
+            if (checked) {
+                // 内水オーバーレイ層を追加
+                try {
+                    if (!map.getSource('internal-flood-overlay')) {
+                        map.addSource('internal-flood-overlay', {
+                            type: 'raster',
+                            tiles: ['https://disaportaldata.gsi.go.jp/raster/02_naisui_data/{z}/{x}/{y}.png'],
+                            tileSize: 256,
+                            attribution: '© <a href="https://www.gsi.go.jp/">国土地理院</a>',
+                            minzoom: 2,
+                            maxzoom: 18
+                        });
+                    }
+
+                    if (!map.getLayer('internal-flood-overlay-layer')) {
+                        map.addLayer({
+                            id: 'internal-flood-overlay-layer',
+                            type: 'raster',
+                            source: 'internal-flood-overlay',
+                            paint: {
+                                'raster-opacity': 0.5 // 50%透過
+                            }
+                        });
+                    }
+
+                    internalFloodOverlayLayer = 'internal-flood-overlay-layer';
+                    console.log('内水オーバーレイ層を表示しました');
+                } catch (error) {
+                    console.error('内水オーバーレイ層の追加に失敗:', error);
+                }
+            } else {
+                // 内水オーバーレイ層を削除
+                try {
+                    if (map.getLayer('internal-flood-overlay-layer')) {
+                        map.removeLayer('internal-flood-overlay-layer');
+                    }
+                    if (map.getSource('internal-flood-overlay')) {
+                        map.removeSource('internal-flood-overlay');
+                    }
+                    internalFloodOverlayLayer = null;
+                    console.log('内水オーバーレイ層を非表示にしました');
+                } catch (error) {
+                    console.error('内水オーバーレイ層の削除に失敗:', error);
+                }
+            }
+        }
+
+        // 内水凡例モーダルの表示
+        window.showInternalFloodLegend = function() {
+            const modal = document.getElementById('internalFloodLegendModal');
+            modal.classList.add('show');
+
+            // 初期位置を設定（洪水凡例と重ならないよう少しずらす）
+            if (!modal.hasAttribute('data-positioned')) {
+                modal.style.left = '350px';
+                modal.style.top = '120px';
+                modal.setAttribute('data-positioned', 'true');
+            }
+
+            // ドラッグ機能を初期化
+            initializeDragging(modal);
+        }
+
+        // 内水凡例モーダルの非表示
+        window.hideInternalFloodLegend = function() {
+            const modal = document.getElementById('internalFloodLegendModal');
+            modal.classList.remove('show');
+        }
+
+        // ドラッグ機能を初期化
+        function initializeDragging(modal) {
+            if (modal.hasAttribute('data-drag-initialized')) {
+                return; // 既に初期化済み
+            }
+
+            const header = modal.querySelector('.legend-header');
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            function startDrag(e) {
+                isDragging = true;
+                modal.classList.add('dragging');
+
+                // マウスまたはタッチの座標を取得
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+
+                startX = clientX;
+                startY = clientY;
+
+                // 現在の位置を取得
+                const rect = modal.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+
+                e.preventDefault();
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+
+                // マウスまたはタッチの座標を取得
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+
+                const deltaX = clientX - startX;
+                const deltaY = clientY - startY;
+
+                const newLeft = initialLeft + deltaX;
+                const newTop = initialTop + deltaY;
+
+                // 画面外に出ないよう制限
+                const maxLeft = window.innerWidth - modal.offsetWidth;
+                const maxTop = window.innerHeight - modal.offsetHeight;
+
+                modal.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + 'px';
+                modal.style.top = Math.max(0, Math.min(newTop, maxTop)) + 'px';
+
+                e.preventDefault();
+            }
+
+            function endDrag() {
+                isDragging = false;
+                modal.classList.remove('dragging');
+            }
+
+            // マウスイベント
+            header.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', endDrag);
+
+            // タッチイベント（スマホ対応）
+            header.addEventListener('touchstart', startDrag, { passive: false });
+            document.addEventListener('touchmove', drag, { passive: false });
+            document.addEventListener('touchend', endDrag);
+
+            modal.setAttribute('data-drag-initialized', 'true');
+        }
+
+        // 主題図パネルの表示/非表示切り替え
+        window.toggleOverlayPanel = function() {
+            const panel = document.getElementById('overlayControls');
+            panel.classList.toggle('hidden');
+        }
+
+        // 最後に記録された位置を取得する関数
+        async function getLastRecordedLocation() {
+            try {
+                const messagesRef = db.collection('messages');
+                const querySnapshot = await messagesRef
+                    .where('location', '!=', null)
+                    .orderBy('location')
+                    .orderBy('timestamp', 'desc')
+                    .limit(1)
+                    .get();
+
+                if (!querySnapshot.empty) {
+                    const lastMessage = querySnapshot.docs[0].data();
+                    if (lastMessage.location && lastMessage.location.lat && lastMessage.location.lng) {
+                        console.log('最後に記録された位置を使用:', lastMessage.location);
+                        return [lastMessage.location.lng, lastMessage.location.lat];
+                    }
+                }
+                return null;
+            } catch (error) {
+                console.warn('最後の位置情報取得に失敗:', error);
+                return null;
+            }
+        }
+
+        // 現在位置を取得する関数（地図初期化用）
+        async function getCurrentLocationForMap() {
+            try {
+                const position = await getCurrentLocation();
+                console.log('現在位置を使用:', position.coords);
+                return [position.coords.longitude, position.coords.latitude];
+            } catch (error) {
+                console.warn('現在位置取得に失敗、デフォルト位置を使用:', error);
+                return window.ENV.DEFAULT_MAP_CENTER;
+            }
+        }
+
+        // 地図の初期表示位置を決定する関数
+        async function getMapInitialCenter() {
+            // まず最後に記録された位置を試す
+            const lastLocation = await getLastRecordedLocation();
+            if (lastLocation) {
+                return lastLocation;
+            }
+
+            // 最後の位置がない場合は現在位置を試す
+            const currentLocation = await getCurrentLocationForMap();
+            return currentLocation;
+        }
+
+        // チェックされている主題図を再描画する関数
+        function redrawActiveOverlays() {
+            if (!map) return;
+
+            // 洪水オーバーレイがチェックされているかチェック
+            const floodCheckbox = document.getElementById('floodOverlay');
+            if (floodCheckbox && floodCheckbox.checked) {
+                console.log('背景図変更に伴い洪水オーバーレイを再描画');
+                // 一度チェックを外して再度チェックすることで再描画
+                floodCheckbox.checked = false;
+                toggleFloodOverlay(false); // 非表示
+                setTimeout(() => {
+                    floodCheckbox.checked = true;
+                    toggleFloodOverlay(true); // 再表示
+                }, 200);
+            }
+
+            // 内水オーバーレイがチェックされているかチェック
+            const internalFloodCheckbox = document.getElementById('internalFloodOverlay');
+            if (internalFloodCheckbox && internalFloodCheckbox.checked) {
+                console.log('背景図変更に伴い内水オーバーレイを再描画');
+                // 一度チェックを外して再度チェックすることで再描画
+                internalFloodCheckbox.checked = false;
+                toggleInternalFloodOverlay(false); // 非表示
+                setTimeout(() => {
+                    internalFloodCheckbox.checked = true;
+                    toggleInternalFloodOverlay(true); // 再表示
+                }, 300); // 洪水オーバーレイと重ならないよう少し遅らせる
+            }
+        }
+
+        // モードレス対応：外クリックでは閉じないように変更
+        // 凡例ウィンドウは明示的にxボタンで閉じる必要がある
+
+        // デバッグログ
+        if (window.ENV.DEBUG_MODE) {
+            console.log('チャットアプリが初期化されました');
+            console.log('Firebase設定:', window.ENV.FIREBASE_CONFIG);
+
+            // テスト用の便利な関数をグローバルに追加
+            window.debugInfo = function() {
+                console.log('--- デバッグ情報 ---');
+                console.log('Firebase初期化済み:', !!auth);
+                console.log('現在のユーザー:', currentUser);
+                console.log('認証状態:', auth ? auth.currentUser : 'auth未初期化');
+            };
+
+            window.testLogin = function() {
+                document.getElementById('loginEmail').value = 'test@example.com';
+                document.getElementById('loginPassword').value = 'test123456';
+                console.log('テスト用の認証情報を入力しました');
+            };
+        }
+    </script>
+</body>
+</html>
