@@ -1,0 +1,31 @@
+{
+  "name": "realtime-chat-app",
+  "version": "1.0.0",
+  "description": "Firebase を利用したリアルタイムチャットアプリケーション",
+  "main": "index.html",
+  "scripts": {
+    "start": "echo 'ブラウザで index.html を開いてアプリケーションを実行してください'",
+    "test": "echo 'テストは設定されていません'"
+  },
+  "keywords": [
+    "chat",
+    "firebase",
+    "realtime",
+    "javascript",
+    "html",
+    "css"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "firebase": "^10.7.0"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
